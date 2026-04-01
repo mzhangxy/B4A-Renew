@@ -24,15 +24,23 @@ def notify(msg):
             print(f"TG notify failed: {e}")
 
 def find_button_by_text(sb, keyword):
-    """遍历所有 button，小写匹配关键字"""
+    """遍历所有 button，小写包含匹配关键字"""
     buttons = sb.find_elements("button")
     for btn in buttons:
         if keyword.lower() in btn.text.lower():
             return btn
     return None
 
+def find_button_exact_text(sb, text):
+    """完全匹配按钮文字（去除首尾空格后比较，忽略大小写）"""
+    buttons = sb.find_elements("button")
+    for btn in buttons:
+        if btn.text.strip().lower() == text.strip().lower():
+            return btn
+    return None
+
 def find_button_xpath(sb, keyword):
-    """XPath 兜底匹配"""
+    """XPath 包含匹配兜底"""
     try:
         return sb.find_element(
             f'//button[contains(translate(text(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"{keyword.lower()}")]'
@@ -55,10 +63,18 @@ def run():
         sb.type("input[placeholder='Email']", EMAIL)
         sb.type("input[placeholder='Password']", PASSWORD)
 
-        # ── 点击 Continue 按钮 ──
-        continue_btn = find_button_by_text(sb, "continue")
+        # ── 点击 Continue 按钮（精确匹配，避免点到 Continue with Google）──
+        print("Looking for Continue button...")
+        continue_btn = find_button_exact_text(sb, "continue")
+
         if continue_btn is None:
-            continue_btn = find_button_xpath(sb, "continue")
+            print("Exact match failed, trying XPath exact match fallback...")
+            try:
+                continue_btn = sb.find_element(
+                    '//button[translate(normalize-space(text()),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz")="continue"]'
+                )
+            except:
+                pass
 
         if continue_btn is None:
             sb.save_screenshot("login_failed.png")
@@ -82,9 +98,10 @@ def run():
             notify(msg)
             raise Exception(msg)
 
+        print("Login successful.")
+
         # ── 判断是否已自动跳转到目标 App 页面 ──
         if APP_ID not in current_url:
-            # 未自动跳转，手动导航
             print(f"Not redirected automatically, navigating to: {APP_URL}")
             sb.open(APP_URL)
             sb.sleep(5)
