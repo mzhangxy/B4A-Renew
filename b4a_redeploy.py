@@ -7,7 +7,9 @@ PASSWORD = os.environ["B4A_PASSWORD"]
 TG_TOKEN = os.environ.get("TG_TOKEN", "")
 TG_CHAT_ID = os.environ.get("TG_CHAT_ID", "")
 
-APP_URL = "https://containers.back4app.com/apps/90148b3e-2353-459f-a1f8-e34377e389bc"
+APP_ID = "90148b3e-2353-459f-a1f8-e34377e389bc"
+APP_URL = f"https://containers.back4app.com/apps/{APP_ID}"
+LOGIN_URL = f"https://www.back4app.com/login?return-url=https%3A%2F%2Fcontainers.back4app.com%2Fapps%2F{APP_ID}"
 PROXY = "http://127.0.0.1:8080"
 
 def notify(msg):
@@ -41,13 +43,32 @@ def find_button_xpath(sb, keyword):
 def run():
     with SB(uc=True, headless=True, proxy=PROXY) as sb:
 
-        # ── 登录 ──
-        print("Navigating to login page...")
-        sb.open("https://www.back4app.com/login")
-        sb.wait_for_element("input[type='email']", timeout=20)
-        sb.type("input[type='email']", EMAIL)
-        sb.type("input[type='password']", PASSWORD)
-        sb.click("button[type='Continue']")
+        # ── 直接打开带 return-url 的登录页 ──
+        print(f"Navigating to login page: {LOGIN_URL}")
+        sb.open(LOGIN_URL)
+        sb.sleep(3)
+        sb.save_screenshot("login_page.png")
+        print("Screenshot saved: login_page.png")
+
+        # ── 填写邮箱和密码 ──
+        sb.wait_for_element("input[placeholder='Email']", timeout=20)
+        sb.type("input[placeholder='Email']", EMAIL)
+        sb.type("input[placeholder='Password']", PASSWORD)
+
+        # ── 点击 Continue 按钮 ──
+        continue_btn = find_button_by_text(sb, "continue")
+        if continue_btn is None:
+            continue_btn = find_button_xpath(sb, "continue")
+
+        if continue_btn is None:
+            sb.save_screenshot("login_failed.png")
+            msg = "❌ 未找到 Continue 登录按钮，请查看截图"
+            print(msg)
+            notify(msg)
+            raise Exception(msg)
+
+        print(f"Clicking login button: '{continue_btn.text.strip()}'")
+        continue_btn.click()
         sb.sleep(5)
 
         # ── 登录结果判断 ──
@@ -61,18 +82,15 @@ def run():
             notify(msg)
             raise Exception(msg)
 
-        print("Login successful, navigating to app page...")
+        # ── 判断是否已自动跳转到目标 App 页面 ──
+        if APP_ID not in current_url:
+            # 未自动跳转，手动导航
+            print(f"Not redirected automatically, navigating to: {APP_URL}")
+            sb.open(APP_URL)
+            sb.sleep(5)
+            current_url = sb.get_current_url()
 
-        # ── 跳转到 App 页面 ──
-        sb.open(APP_URL)
-        sb.sleep(5)
-
-        # ── 判断是否成功到达目标页面 ──
-        current_url = sb.get_current_url()
-        print(f"Current URL after navigation: {current_url}")
-
-        app_id = "90148b3e-2353-459f-a1f8-e34377e389bc"
-        if app_id not in current_url:
+        if APP_ID not in current_url:
             sb.save_screenshot("wrong_page.png")
             msg = f"❌ 未到达目标 App 页面，当前 URL: {current_url}"
             print(msg)
@@ -112,7 +130,6 @@ def run():
         for i in range(5):
             sb.sleep(3)
             print(f"Checking if button disappeared... attempt {i+1}/5")
-
             btn_check = find_button_by_text(sb, "redeploy")
             if btn_check is None:
                 click_confirmed = True
