@@ -1,8 +1,8 @@
 name: B4A Auto Redeploy
 
 on:
-  repository_dispatch:
-    types: [googlecloud-trigger]   # 必须和 event_type 完全一致
+  #repository_dispatch:
+  #  types: [googlecloud-trigger]   # 必须和 event_type 完全一致
   workflow_dispatch:
 
 jobs:
@@ -17,9 +17,9 @@ jobs:
       - name: Checkout private repo
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.repository_owner }}/BforA-Auto
+          repository: ${{ github.repository_owner }}/Back4app
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-          path: scripts
+          path: .
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -30,32 +30,17 @@ jobs:
         run: |
           pip install seleniumbase requests pynacl
 
-      - name: Install gost
-        run: |
-          wget -q https://github.com/ginuerzh/gost/releases/download/v2.11.5/gost-linux-amd64-2.11.5.gz
-          gunzip gost-linux-amd64-2.11.5.gz
-          chmod +x gost-linux-amd64-2.11.5
-          sudo mv gost-linux-amd64-2.11.5 /usr/local/bin/gost
-
-      - name: Start gost proxy
-        env:
-          PROXY_URL: ${{ secrets.PROXY_URL }}
-        run: |
-          gost -L=http://:8080 -F="${PROXY_URL}" &
-          sleep 5
-          echo "gost started"
-
       - name: Run redeploy script
         env:
           CONNECT_SID: ${{ secrets.CONNECT_SID }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
-        run: python scripts/b4a_redeploy.py
+        run: python b4a_redeploy.py
 
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: screenshots
-          path: "scripts/*.png"
+          path: "*.png"
